@@ -1,0 +1,362 @@
+---
+title: "Project"
+author: "Annie Cohen"
+date: "4/5/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(deSolve)
+```
+
+```{r EDA}
+obsdata <- readRDS("incidence_hashtags.rds")
+
+colnames(obsdata) <- c("date","incidence")
+
+obsdata <- obsdata %>%
+  filter(date > obsdata$date[18])
+
+obsdata %>%
+  ggplot(aes(date,incidence)) +
+  geom_line() +
+  theme_classic() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
+
+obsdata %>%
+  mutate(runavg = zoo::rollmean(incidence, k = 7, fill = NA)) %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = incidence)) +
+  geom_line(aes(y = runavg), col = "blue", alpha = 0.5) +
+  theme_classic()
+```
+
+```{r basic model}
+SIR_basic <- function(t,x,param){
+    
+  beta = param[1]
+  delta = param[2]
+  alpha = param[3]
+  N = param[4]
+  
+  if (t > delta){
+    gamma = param[5]
+    zeta = param[6]
+  }
+  else{
+    gamma = 0
+    zeta = 0
+  }
+  
+  S = x[1]
+  inc = x[2]
+  I = x[3]
+  R = x[4]
+
+  dxdt = numeric(length(x))
+  dxdt[1] = -beta*S*I/N
+  dxdt[2] = beta*S*I/N
+  dxdt[3] = beta*S*I/N-alpha*I
+  dxdt[4] = alpha*I
+  
+  return(list(dxdt))
+}
+```
+
+```{r simple model running}
+n_days = length(obsdata$date)
+timerange = seq(1,n_days)
+
+beta = 0.3
+delta = 14
+alpha = 0.11
+N = 9999
+
+gamma = 0.01/7
+zeta = 0.06/7
+
+param = c(beta, delta, alpha, N, gamma, zeta)
+
+x0 <- rep(0,4)
+x0[1] = 7060.94
+x0[2] = 131
+x0[3] = 1.1
+x0[4] = 2936.53
+
+out = ode(y=x0,times=timerange, func=SIR_basic, parms = param, method = 'ode45')
+
+out_df <- data.frame(out) %>%
+  mutate(diff = c(0,-1*diff(out[,2])))
+
+out_df %>%
+  ggplot(aes(x = obsdata$date, y = diff)) +
+  geom_vline(xintercept = lubridate::as_date("2020-04-08"), lty = 2, col = "gray", size = 1) +
+  geom_line() +
+  geom_point(aes(y = obsdata$incidence), col = "blue") +
+  theme_classic() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
+```
+
+```{r fact checking model}
+SIR_factcheck <- function(t,x,param){
+    
+  beta = param[1]
+  delta = param[2]
+  alpha = param[3]
+  N = param[4]
+  
+  if (t > delta){
+    gamma = param[5]
+  }
+  else{
+    gamma = 0
+  }
+  
+  S = x[1]
+  inc = x[2]
+  I = x[3]
+  R = x[4]
+
+  dxdt = numeric(length(x))
+  dxdt[1] = -beta*S*I/N-gamma*S
+  dxdt[2] = beta*S*I/N
+  dxdt[3] = beta*S*I/N-alpha*I
+  dxdt[4] = alpha*I
+  
+  return(list(dxdt))
+}
+```
+
+```{r factchecking model running}
+n_days = length(obsdata$date)
+timerange = seq(1,n_days)
+
+beta = 0.3
+delta = 14
+alpha = 0.11
+N = 9999
+
+gamma = 0.01/7
+zeta = 0.06/7
+
+param = c(beta, delta, alpha, N, gamma, zeta)
+
+x0 <- rep(0,4)
+x0[1] = 7060.94
+x0[2] = 131
+x0[3] = 1.1
+x0[4] = 2936.53
+
+out = ode(y=x0,times=timerange, func=SIR_factcheck, parms = param, method = 'ode45')
+
+out_df <- data.frame(out) %>%
+  mutate(diff = c(0,diff(out[,3])))
+
+out_df %>%
+  ggplot(aes(x = obsdata$date, y = diff)) +
+  geom_vline(xintercept = lubridate::as_date("2020-04-08"), lty = 2, col = "gray", size = 1) +
+  geom_line() +
+  geom_point(aes(y = obsdata$incidence), col = "blue") +
+  theme_classic() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
+```
+
+```{r tweet deletion model}
+SIR_deletion <- function(t,x,param){
+
+  beta = param[1]
+  delta = param[2]
+  alpha = param[3]
+  N = param[4]
+  
+  if (t > delta){
+    zeta = param[6]
+  }
+  else{
+    zeta = 0
+  }
+  
+  S = x[1]
+  inc = x[2]
+  I = x[3]
+  R = x[4]
+
+  dxdt = numeric(length(x))
+  dxdt[1] = -beta*S*I/N
+  dxdt[2] = beta*S*I/N
+  dxdt[3] = beta*S*I/N-(alpha+zeta)*I
+  dxdt[4] = (alpha+zeta)*I
+  
+  return(list(dxdt))
+}
+```
+
+```{r tweet deletion model running}
+n_days = length(obsdata$date)
+timerange = seq(1,n_days)
+
+beta = 0.3
+delta = 14
+alpha = 0.11
+N = 9999
+
+gamma = 0.01/7
+zeta = 0.06/7
+
+param = c(beta, delta, alpha, N, gamma, zeta)
+
+x0 <- rep(0,4)
+x0[1] = 7060.94
+x0[2] = 131
+x0[3] = 1.1
+x0[4] = 2936.53
+
+out = ode(y=x0,times=timerange, func=SIR_deletion, parms = param, method = 'ode45')
+
+out_df <- data.frame(out) %>%
+  mutate(diff = c(0,diff(out[,3])))
+
+out_df %>%
+  ggplot(aes(x = obsdata$date, y = diff)) +
+  geom_vline(xintercept = lubridate::as_date("2020-04-08"), lty = 2, col = "gray", size = 1) +
+  geom_line() +
+  geom_point(aes(y = obsdata$incidence), col = "blue") +
+  theme_classic() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
+```
+
+```{r mixed effects model}
+SIR_mixed <- function(t,x,param){
+    
+  beta = param[1]
+  delta = param[2]
+  alpha = param[3]
+  N = param[4]
+  
+  if (t > delta){
+    gamma = param[5]
+    zeta = param[6]
+  }
+  else{
+    gamma = 0
+    zeta = 0
+  }
+  
+  S = x[1]
+  inc = x[2]
+  I = x[3]
+  R = x[4]
+
+  dxdt = numeric(length(x))
+  dxdt[1] = -beta*S*I/N-gamma*S
+  dxdt[2] = beta*S*I/N
+  dxdt[3] = beta*S*I/N-(alpha+zeta)*I
+  dxdt[4] = (alpha+zeta)*I+gamma*S
+  
+  return(list(dxdt))
+}
+```
+
+```{r mixed model running}
+n_days = length(obsdata$date)
+timerange = seq(1,n_days)
+
+beta = 0.3
+delta = 14
+alpha = 0.11
+N = 9999
+
+gamma = 0.01/7
+zeta = 0.06/7
+
+param = c(beta, delta, alpha, N, gamma, zeta)
+
+x0 <- rep(0,4)
+x0[1] = 7060.94
+x0[2] = 131
+x0[3] = 1.1
+x0[4] = 2936.53
+
+out = ode(y=x0,times=timerange, func=SIR_mixed, parms = param, method = 'ode45')
+plot(out[,3])
+out_df <- data.frame(out) %>%
+  mutate(diff = c(0,diff(out[,3])))
+
+out_df %>%
+  ggplot(aes(x = obsdata$date, y = diff)) +
+  geom_vline(xintercept = lubridate::as_date("2020-04-08"), lty = 2, col = "gray", size = 1) +
+  geom_line() +
+  geom_point(aes(y = obsdata$incidence), col = "blue") +
+  theme_classic() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
+```
+
+```{r}
+n_days = length(obsdata$date)
+timerange = seq(1,n_days)
+
+incidence_out <- data.frame(delta = c(rep(14,16),rep(42,16),rep(59,16)),
+           gamma = rep(c(rep(0,4),rep(.01/7,4),rep(.03/7,4),rep(.05/7,4)),3),
+           zeta = c(rep(c(0,0.06/7,0.12/7,0.25/7))), incidence = rep(NA,48))
+
+for (i in 1:48){
+  param = c(0.3, incidence_out$delta[i], 0.11, 9999, incidence_out$gamma[i], incidence_out$zeta[i])
+  
+  x0 <- rep(0,4)
+  x0[1] = 7060.94
+  x0[2] = 131
+  x0[3] = 1.1
+  x0[4] = 2936.53
+  
+  out = ode(y=x0,times=timerange, func=SIR_mixed, parms = param, method = 'ode45')
+  
+  out_df <- data.frame(out) %>%
+    mutate(diff = c(0,diff(out[,3])))
+  
+  incidence_out$incidence[i] <- list(out_df$diff)
+}
+
+vars <- incidence_out[,1:3]
+lst <- unlist(lapply(incidence_out$incidence, unlist))
+
+df <- vars %>%
+  slice(rep(1:48,each = 202)) %>%
+  mutate(incidence = lst,
+         time = rep(timerange, 48))
+
+basic<-df[which(df$zeta==0&df$gamma==0),] %>%
+  select(incidence) %>%
+  unique()
+
+new_df <- df[-which(df$zeta==0&df$gamma==0),] %>%
+  mutate(basic = rep(basic$incidence,45),
+         model = factor(ifelse(zeta == 0, "factcheck",
+                               ifelse(gamma == 0, "deletion",
+                               ifelse(gamma == unique(new_df$gamma)[2] & zeta == unique(new_df$zeta)[1] |
+           gamma == unique(new_df$gamma)[3] & zeta == unique(new_df$zeta)[2] |
+           gamma == unique(new_df$gamma)[4] & zeta == unique(new_df$zeta)[3],"mixed",NA))),levels = c("factcheck","deletion","mixed")),
+         type = ifelse((gamma == unique(new_df$gamma)[2] & zeta == 0)|(zeta == unique(new_df$zeta)[1] & gamma == 0) | (gamma == unique(new_df$gamma)[2] & zeta == unique(new_df$zeta)[1]),"level 1",
+                              ifelse((gamma == unique(new_df$gamma)[3] & zeta == 0)|(zeta == unique(new_df$zeta)[2] & gamma == 0) | (gamma == unique(new_df$gamma)[3] & zeta == unique(new_df$zeta)[2]),"level 2",
+                                     ifelse((gamma == unique(new_df$gamma)[4] & zeta == 0)|(zeta == unique(new_df$zeta)[3] & gamma == 0) | (gamma == unique(new_df$gamma)[4] & zeta == unique(new_df$zeta)[3]),"level 3",NA)))) %>%
+  filter(!is.na(model)) 
+
+new_df$delta1 <- factor(new_df$delta, labels = c("delta==14","delta==42","delta==59"))
+
+new_df %>%
+  ggplot(aes(x = time,y = incidence)) +
+  geom_line(aes(y = basic, col = "Hi"), size = 1) +
+  geom_path(aes(col = type), size = 1) +
+  geom_vline(aes(xintercept = delta), col = "red", lty = 2, size = 0.5)+
+  facet_grid(model~delta1, labeller = label_parsed) +
+  geom_vline(xintercept = 73, lty = 2, alpha = 0.5, size = 0.5)+
+  geom_vline(xintercept = 0, lty = 2, alpha = 0.5, size = 0.5)+
+  theme_linedraw() +
+  theme(axis.line = element_line(color = "grey95"), strip.background = element_rect(fill = "grey95", colour = "grey95"), strip.text = element_text(colour = "black"), panel.border = element_rect(colour = "grey95"), panel.grid = element_line(colour = "gray"), legend.text.align = 0) +
+scale_color_manual(values = c("gray","red2","seagreen","orange"), labels = c(expression("Basic:"~gamma[0]==0~ "and"~zeta[0]==0),expression(gamma[1]==1*"% and/or" ~zeta[1]==6*"%"),expression(gamma[2]==3*"% and/or"~zeta[2]==12*"%"),expression(gamma[3]==5*"% and/or"~zeta[3]==25*"%"))) +
+  labs(x = "Time",y = "Incidence", col = "Type")
+
+ggsave("fig2.png")
+```
