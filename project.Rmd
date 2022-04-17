@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(knitr)
 library(deSolve)
+library(wesanderson)
 ```
 
 ```{r EDA}
@@ -66,7 +67,7 @@ SIR_basic <- function(t,x,param){
 }
 ```
 
-```{r simple model running}
+```{r basic model running}
 n_days = length(obsdata$date)
 timerange = seq(1,n_days)
 
@@ -75,8 +76,8 @@ delta = 14
 alpha = 0.11
 N = 9999
 
-gamma = 0.01/7
-zeta = 0.06/7
+gamma = 0
+zeta = 0
 
 param = c(beta, delta, alpha, N, gamma, zeta)
 
@@ -98,6 +99,8 @@ out_df %>%
   geom_point(aes(y = obsdata$incidence), col = "blue") +
   theme_classic() +
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
+
+max(out_df[,4])
 ```
 
 ```{r fact checking model}
@@ -146,7 +149,7 @@ param = c(beta, delta, alpha, N, gamma, zeta)
 
 x0 <- rep(0,4)
 x0[1] = 7060.94
-x0[2] = 131
+x0[2] = 1.1
 x0[3] = 1.1
 x0[4] = 2936.53
 
@@ -162,6 +165,8 @@ out_df %>%
   geom_point(aes(y = obsdata$incidence), col = "blue") +
   theme_classic() +
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
+
+max(out_df[,4])
 ```
 
 ```{r tweet deletion model}
@@ -276,7 +281,7 @@ param = c(beta, delta, alpha, N, gamma, zeta)
 
 x0 <- rep(0,4)
 x0[1] = 7060.94
-x0[2] = 131
+x0[2] = 1.1
 x0[3] = 1.1
 x0[4] = 2936.53
 
@@ -294,7 +299,7 @@ out_df %>%
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
 ```
 
-```{r}
+```{r grid figure}
 n_days = length(obsdata$date)
 timerange = seq(1,n_days)
 
@@ -340,23 +345,189 @@ new_df <- df[-which(df$zeta==0&df$gamma==0),] %>%
            gamma == unique(new_df$gamma)[4] & zeta == unique(new_df$zeta)[3],"mixed",NA))),levels = c("factcheck","deletion","mixed")),
          type = ifelse((gamma == unique(new_df$gamma)[2] & zeta == 0)|(zeta == unique(new_df$zeta)[1] & gamma == 0) | (gamma == unique(new_df$gamma)[2] & zeta == unique(new_df$zeta)[1]),"level 1",
                               ifelse((gamma == unique(new_df$gamma)[3] & zeta == 0)|(zeta == unique(new_df$zeta)[2] & gamma == 0) | (gamma == unique(new_df$gamma)[3] & zeta == unique(new_df$zeta)[2]),"level 2",
-                                     ifelse((gamma == unique(new_df$gamma)[4] & zeta == 0)|(zeta == unique(new_df$zeta)[3] & gamma == 0) | (gamma == unique(new_df$gamma)[4] & zeta == unique(new_df$zeta)[3]),"level 3",NA)))) %>%
-  filter(!is.na(model)) 
+                                     ifelse((gamma == unique(new_df$gamma)[4] & zeta == 0)|(zeta == unique(new_df$zeta)[3] & gamma == 0) | (gamma == unique(new_df$gamma)[4] & zeta == unique(new_df$zeta)[3]),"level 3",NA))),
+         date = rep(obsdata$date,45)) %>%
+  filter(!is.na(model))
 
-new_df$delta1 <- factor(new_df$delta, labels = c("delta==14","delta==42","delta==59"))
+new_df$date[delta]
 
 new_df %>%
-  ggplot(aes(x = time,y = incidence)) +
-  geom_line(aes(y = basic, col = "Hi"), size = 1) +
-  geom_path(aes(col = type), size = 1) +
-  geom_vline(aes(xintercept = delta), col = "red", lty = 2, size = 0.5)+
-  facet_grid(model~delta1, labeller = label_parsed) +
-  geom_vline(xintercept = 73, lty = 2, alpha = 0.5, size = 0.5)+
-  geom_vline(xintercept = 0, lty = 2, alpha = 0.5, size = 0.5)+
+  ggplot(aes(x = date,y = incidence)) +
+  geom_line(aes(y = basic, col = "hi"), size = 0.75) +
+  geom_path(aes(col = type), size = 0.75) +
+  geom_vline(aes(xintercept = date[delta]), col = "red", lty = 2, size = 0.5)+
+  facet_grid(model~delta, labeller = label_both) +
+  geom_vline(xintercept = as.Date("2020-04-08"), lty = 2, alpha = 0.5, size = 0.5)+
+  geom_vline(xintercept = as.Date("2020-01-27"), lty = 2, alpha = 0.5, size = 0.5)+
   theme_linedraw() +
-  theme(axis.line = element_line(color = "grey95"), strip.background = element_rect(fill = "grey95", colour = "grey95"), strip.text = element_text(colour = "black"), panel.border = element_rect(colour = "grey95"), panel.grid = element_line(colour = "gray"), legend.text.align = 0) +
-scale_color_manual(values = c("gray","red2","seagreen","orange"), labels = c(expression("Basic:"~gamma[0]==0~ "and"~zeta[0]==0),expression(gamma[1]==1*"% and/or" ~zeta[1]==6*"%"),expression(gamma[2]==3*"% and/or"~zeta[2]==12*"%"),expression(gamma[3]==5*"% and/or"~zeta[3]==25*"%"))) +
-  labs(x = "Time",y = "Incidence", col = "Type")
+  theme(axis.line = element_line(color = "grey95"), strip.background = element_rect(fill = "grey95", colour = "grey95"), strip.text = element_text(face = "bold", color = "black", size = 10), panel.border = element_rect(colour = "grey60"), panel.grid = element_line(colour = "gray"), legend.text.align = 0, legend.position = c(0.92,0.88), legend.title = element_text(size = 8, face = "bold"), legend.text = element_text(size = 8), legend.key.size = unit(0.35,'cm')) +
+scale_color_manual(values = c("gray","red2","seagreen","orange"), labels = c(expression(gamma==zeta~"= 0"),expression(gamma*","~zeta~"low"),expression(gamma*","~zeta~"mid"),expression(gamma*","~zeta~"high"))) +
+  labs(x = "Date",y = "Incidence", col = "Type")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
-ggsave("fig2.png")
+ggsave("fig2.png", width = 7, height = 7)
+```
+
+```{r factcheck heatmap (top left)}
+factcheck <- data.frame("delta"=c(rep(0:70,each=61)),"gamma" = c(rep(seq(0,0.06/7,by=0.001/7),71)), "IP"=rep(NA,4331))
+
+for (i in 1:4331){
+  param = c(0.3, factcheck$delta[i], 0.11, 9999, factcheck$gamma[i], 0)
+  
+  x0 <- rep(0,4)
+  x0[1] = 7060.94
+  x0[2] = 1.1
+  x0[3] = 1.1
+  x0[4] = 2936.53
+  
+  out = ode(y=x0,times=timerange, func=SIR_factcheck, parms = param, method = 'ode45')
+  
+  factcheck$IP[i] <- out[202,3]/7060.94
+}
+
+wes_palette("Zissou1")
+pal <- wes_palette("Zissou1", 21, type = "continuous")
+
+fc <- factcheck %>%
+  ggplot(aes(x = delta, y = gamma)) +
+  geom_tile(aes(fill = IP)) +
+  scale_fill_gradientn(colors = pal) +
+  labs(x = expression(delta), y = expression(gamma)) +
+  theme_minimal()
+```
+
+```{r tweet deletion heat map (top right)}
+tweet_delete <- data.frame("delta"=c(rep(0:70,each=61)),"zeta" = c(rep(seq(0,0.3/7,by=0.005/7),71)), "IP"=rep(NA,4331))
+
+for (i in 1:4331){
+  param = c(0.3, tweet_delete$delta[i], 0.11, 9999, 0, tweet_delete$zeta[i])
+  
+  x0 <- rep(0,4)
+  x0[1] = 7060.94
+  x0[2] = 1.1
+  x0[3] = 1.1
+  x0[4] = 2936.53
+  
+  out = ode(y=x0,times=timerange, func=SIR_deletion, parms = param, method = 'ode45')
+  
+  tweet_delete$IP[i] <- out[202,3]/7060.94
+}
+
+pal <- wes_palette("Zissou1", 21, type = "continuous")
+
+td <- tweet_delete %>%
+  ggplot(aes(x = delta, y = zeta)) +
+  geom_tile(aes(fill = IP)) +
+  scale_fill_gradientn(colors = pal) +
+  labs(x = expression(delta), y = expression(zeta)) +
+  theme_minimal()
+
+gridExtra::grid.arrange(fc, td, nrow = 1)
+```
+
+```{r plotting the bottom three heatmaps}
+mixed <- data.frame("delta" = rep(c(14,42,59),each = 3721), "gamma" = rep(c(rep(seq(0,0.06/7,by=0.001/7),61)),3), "zeta" = rep(c(rep(seq(0,0.3/7,by=0.005/7),each = 61)),3), IP = rep(NA,11163))
+
+for (i in 1:11163){
+  param = c(0.3, mixed$delta[i], 0.11, 9999, mixed$gamma[i], mixed$zeta[i])
+  
+  x0 <- rep(0,4)
+  x0[1] = 7060.94
+  x0[2] = 1.1
+  x0[3] = 1.1
+  x0[4] = 2936.53
+  
+  out = ode(y=x0,times=timerange, func=SIR_mixed, parms = param, method = 'ode45')
+  
+  mixed$IP[i] <- out[202,3]/7060.94
+}
+
+m <- mixed %>%
+  ggplot(aes(x = zeta, y = gamma)) +
+  geom_tile(aes(fill = IP)) +
+  scale_fill_gradientn(colors = pal) +
+  facet_wrap(~delta, scales = "free", labeller = label_both) +
+  labs(y = expression(gamma), x = expression(zeta)) +
+  theme_minimal()
+
+gridExtra::grid.arrange(fc, td, m, nrow = 2, layout_matrix = rbind(c(1,2),c(3,3)))
+g<-gridExtra::arrangeGrob(fc, td, m, nrow = 2, layout_matrix = rbind(c(1,2),c(3,3)))
+
+ggsave("fig3.png", g, width = 12, height = 7)
+```
+
+
+```{r mixed effects SEIR model}
+SEIR_mixed <- function(t,x,param){
+  beta = param[1]
+  delta = param[2]
+  alpha = param[3]
+  N = 9999
+  sigma = param[7]
+  
+  if (t > delta){
+    gamma = param[5]
+    zeta = param[6]
+  }
+  else{
+    gamma = 0
+    zeta = 0
+  }
+  
+  S = x[1]
+  E = x[2]
+  inc = x[3]
+  I = x[4]
+  R = x[5]
+
+  dxdt = numeric(length(x))
+  dxdt[1] = -beta*S*I/N
+  dxdt[2] = beta*S*I/N-(sigma+gamma)*E
+  dxdt[3] = sigma*E
+  dxdt[4] = sigma*E-(alpha+zeta)*I
+  dxdt[5] = (alpha+zeta)*I+gamma*E
+  
+  return(list(dxdt))
+}
+```
+
+```{r running the new SEIR model}
+param = c(0.45, 42, 0.11, 9999, 0, 0, 0.2)
+
+x0 <- rep(0,5)
+x0[1] = 7060.94
+x0[2] = 1.1
+x0[3] = 1.1
+x0[4] = 1.1
+x0[5] = 2936.53
+
+out <- ode(y=x0,times=timerange, func=SEIR_mixed, parms = param, method = 'ode45')
+leg_ord <- c("S","E","I","R")
+
+data.frame(out) %>%
+  mutate(date = obsdata$date) %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = X2, col = "E")) +
+  geom_line(aes(y = X4, col = "I")) +
+  geom_line(aes(y = X1, col = "S")) +
+  geom_line(aes(y = X5, col = "R")) +
+  scale_color_manual(breaks = leg_ord, values = c("purple","darkgreen","orange","cornflowerblue")) +
+  scale_x_date(breaks = "1 month", date_labels = "%b") +
+  labs(y = "Size",x = "Date", col = "") +
+  theme_classic() +
+  theme(text = element_text(size = 16))
+
+ggsave("fig5.png", width = 5, height = 7)
+
+data.frame(out) %>%
+  mutate(date = obsdata$date) %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = c(0,diff(X3)))) +
+  geom_point(aes(y = obsdata$incidence), col = "cornflowerblue") +
+  scale_x_date(breaks = "1 month", date_labels = "%b") +
+  labs(y = "Incidence", x = "Date") +
+  theme_classic() +
+  theme(text = element_text(size = 16))
+
+ggsave("fig4.png", width = 7, height = 7)
 ```
