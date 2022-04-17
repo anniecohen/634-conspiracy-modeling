@@ -15,7 +15,7 @@ library(wesanderson)
 ```
 
 ```{r EDA}
-obsdata <- readRDS("incidence_hashtags.rds")
+obsdata <- readRDS("/Users/ryanmcintosh/Documents/UM SPH/Winter 2022/EPID 634/Projects/Final Project/incidence_hashtags.rds")
 
 colnames(obsdata) <- c("date","incidence")
 
@@ -102,6 +102,37 @@ out_df %>%
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
 max(out_df[,4])
+
+# Calculating cumulative error for SIR Basic
+n_days = length(obsdata$date)
+timerange = seq(1,n_days)
+
+beta = 0.3
+delta = 14
+alpha = 0.11
+N = 9999
+gamma = 0
+zeta = 0
+param = c(beta, delta, alpha, N, gamma, zeta)
+
+x0 <- rep(0,4)
+x0[1] = 7060.94
+x0[2] = 0
+x0[3] = 1.1
+x0[4] = 2936.53
+
+solved = as.data.frame(ode(y=x0,times=timerange, func=SIR_basic, parms = param, method = 'ode45'))
+names(solved) = c('Time', 'S', 'inc', 'I', 'R')
+  
+obsdata$cumulative = cumsum(obsdata$incidence)
+  
+SIR2norm = sqrt(sum((obsdata$cumulative - solved$inc)^2)) / sqrt(sum(obsdata$cumulative^2))
+
+print(SIR2norm)
+
+# That almost matches the paper- 0.0566 for ours, compared to 0.0561 for theirs
+# Only if I set the initial incidence to 0, though. Setting x[2] to 131 gives a higher error
+
 ```
 
 ```{r fact checking model}
@@ -298,6 +329,7 @@ out_df %>%
   geom_point(aes(y = obsdata$incidence), col = "blue") +
   theme_classic() +
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
+
 ```
 
 ```{r grid figure}
@@ -493,24 +525,30 @@ SEIR_mixed <- function(t,x,param){
 ```
 
 ```{r optimizing for sigma}
-# Adding a function to calculate sum of errors squared for the optimizer
-ssq = function(sigma){
-  parms = c(0.45, 42, 0.11, 9999, 0, 0, sigma)
-  x0 = c(7060.94, 1.1, 1.1, 1.1, 2936.53)
+
+# Adding in the relative error 2-norm function to optimize sigma
+re2norm = function(sigma){
+  parms = c(0.3, 42, 0.11, 9999, 0, 0, sigma)
+  x0 = c(7060.94, 0, 0, 1.1, 2936.53)
   
   solved = as.data.frame(ode(y = x0, times = timerange, func = SEIR_mixed,
                              parms = parms, method = 'ode45'))
   names(solved) = c('Time', 'S', 'E', 'inc', 'I', 'R')
   
-  out = sum((obsdata$incidence - c(0, diff(solved$inc)))^2)
+  out = sqrt(sum((obsdata$cumulative - solved$inc)^2)) / sqrt(sum(obsdata$cumulative^2))
   
   return(out)
 }
 
 # Running the optimizer
-range = c(0, 1)
-optimized = optimize(f = ssq, interval = range)
-opt_sigma = as.numeric(optimized[1])
+range = c(0, 100)
+opt2norm = optimize(f = re2norm, interval = range)
+opt_sigma = as.numeric(opt2norm[1])
+
+# Calculating cumulative error with optimized sigma
+print(re2norm(opt_sigma))
+
+# Not a great result. Looks like adding in E increases error. The lowest error comes from the highest possible sigma (basically making Exposed a pass-through compartment)
 
 ```
 
