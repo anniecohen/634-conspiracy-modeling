@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(knitr)
 library(deSolve)
+# install.packages('wesanderson')
 library(wesanderson)
 ```
 
@@ -491,8 +492,30 @@ SEIR_mixed <- function(t,x,param){
 }
 ```
 
+```{r optimizing for sigma}
+# Adding a function to calculate sum of errors squared for the optimizer
+ssq = function(sigma){
+  parms = c(0.45, 42, 0.11, 9999, 0, 0, sigma)
+  x0 = c(7060.94, 1.1, 1.1, 1.1, 2936.53)
+  
+  solved = as.data.frame(ode(y = x0, times = timerange, func = SEIR_mixed,
+                             parms = parms, method = 'ode45'))
+  names(solved) = c('Time', 'S', 'E', 'inc', 'I', 'R')
+  
+  out = sum((obsdata$incidence - c(0, diff(solved$inc)))^2)
+  
+  return(out)
+}
+
+# Running the optimizer
+range = c(0, 1)
+optimized = optimize(f = ssq, interval = range)
+opt_sigma = as.numeric(optimized[1])
+
+```
+
 ```{r running the new SEIR model}
-param = c(0.45, 42, 0.11, 9999, 0, 0, 0.2)
+param = c(0.45, 42, 0.11, 9999, 0, 0, opt_sigma)
 
 x0 <- rep(0,5)
 x0[1] = 7060.94
