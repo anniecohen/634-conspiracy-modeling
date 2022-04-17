@@ -540,15 +540,46 @@ re2norm = function(sigma){
   return(out)
 }
 
+fulloptim = function(parms){
+  beta = parms[1]
+  delta = 42
+  alpha = parms[2]
+  N = 9999
+  gamma = 0
+  zeta = 0
+  sigma = parms[3]
+  
+  params = c(beta, delta, alpha, N, gamma, zeta, sigma)
+  x0 = c(7060.94, 0, 0, 1.1, 2936.53)
+  n_days = length(obsdata$date)
+  timerange = seq(1,n_days)
+  
+  solved = as.data.frame(ode(x0, timerange, SEIR_mixed, params, method = 'ode45'))
+  
+  names(solved) = c('Time', 'S', 'E', 'inc', 'I', 'R')
+  
+  out = sqrt(sum((obsdata$cumulative - solved$inc)^2)) / sqrt(sum(obsdata$cumulative^2))
+  
+  return(out)
+}
+
 # Running the optimizer
+# Just for sigma
 range = c(0, 100)
 opt2norm = optimize(f = re2norm, interval = range)
 opt_sigma = as.numeric(opt2norm[1])
 
-# Calculating cumulative error with optimized sigma
+# Calculating cumulative error with optimized sigma, same beta and alpha as SIR
 print(re2norm(opt_sigma))
 
-# Not a great result. Looks like adding in E increases error. The lowest error comes from the highest possible sigma (basically making Exposed a pass-through compartment)
+# For all parameters
+guesses = c(0.3, 0.11, 0.2)
+opt2norm_all = optim(guesses, fulloptim)
+optimized3 = opt2norm_all$par[1:3]
+
+# Checking cumulative error with optimized beta, alpha, and sigma
+print(fulloptim(optimized3))
+
 
 ```
 
