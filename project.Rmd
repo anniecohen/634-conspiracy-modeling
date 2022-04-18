@@ -15,7 +15,7 @@ library(wesanderson)
 ```
 
 ```{r EDA}
-obsdata <- readRDS("/Users/ryanmcintosh/Documents/UM SPH/Winter 2022/EPID 634/Projects/Final Project/incidence_hashtags.rds")
+obsdata <- readRDS("incidence_hashtags.rds")
 
 colnames(obsdata) <- c("date","incidence")
 
@@ -663,8 +663,6 @@ ggplot(data = SIRincidence, aes(x = date)) +
   theme(text = element_text(size = 16))
 
 ggsave("fig6.png", width = 7, height = 7)
-
-
 
 ```
 
