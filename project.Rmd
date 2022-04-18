@@ -526,7 +526,7 @@ SEIR_mixed <- function(t,x,param){
 
 ```{r optimizing for sigma}
 
-# Adding in the relative error 2-norm function to optimize sigma
+# Adding in the relative error 2-norm function to optimize sigma while keeping beta and alpha the same as for SIR model
 re2norm = function(sigma){
   parms = c(0.3, 42, 0.11, 9999, 0, 0, sigma)
   x0 = c(7060.94, 0, 0, 1.1, 2936.53)
@@ -623,3 +623,28 @@ data.frame(out) %>%
 
 ggsave("fig4.png", width = 7, height = 7)
 ```
+
+```{r Remaking Figure 4 with SIR model}
+parms = c(0.3, 11, 0.11, 9999, 0, 0)
+x0 = c(7060.94, 0, 1.1, 2936.53)
+n_days = length(obsdata$date)
+timerange = seq(1,n_days)
+
+SIRincidence = as.data.frame(ode(x0, timerange, SIR_basic, parms, method = 'ode45'))
+names(SIRincidence) = c('Time', 'S', 'inc', 'I', 'R')
+SIRincidence$date = obsdata$date
+
+ggplot(data = SIRincidence, aes(x = date)) +
+  geom_line(aes(y = c(0,diff(inc)))) +
+  geom_point(aes(y = obsdata$incidence), col = "cornflowerblue") +
+  scale_x_date(breaks = "1 month", date_labels = "%b") +
+  labs(y = "Incidence", x = "Date") +
+  theme_classic() +
+  theme(text = element_text(size = 16))
+
+ggsave("fig6.png", width = 7, height = 7)
+
+
+
+```
+
