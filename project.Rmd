@@ -91,10 +91,9 @@ x0[4] = 2936.53
 out = ode(y=x0,times=timerange, func=SIR_basic, parms = param, method = 'ode45')
 
 out_df <- data.frame(out) %>%
-  mutate(diff = c(0,-1*diff(out[,2])))
+  mutate(diff = c(0,diff(out[,3])))
 
-out_df = as.data.frame()
-names(out_df) = c('Time', 'S', 'inc', 'I', 'R')
+names(out_df) = c('Time', 'S', 'inc', 'I', 'R','diff')
 out_df$date = obsdata$date
 order = c('S', 'I', 'R')
 
@@ -114,7 +113,7 @@ ggsave("fig7.png", width = 7, height = 7)
   
 
 out_df %>%
-  ggplot(aes(x = obsdata$date, y = diff)) +
+  ggplot(aes(x = date, y = diff)) +
   geom_vline(xintercept = lubridate::as_date("2020-04-08"), lty = 2, col = "gray", size = 1) +
   geom_line() +
   geom_point(aes(y = obsdata$incidence), col = "blue") +
@@ -389,7 +388,9 @@ basic<-df[which(df$zeta==0&df$gamma==0),] %>%
   select(incidence) %>%
   unique()
 
-new_df <- df[-which(df$zeta==0&df$gamma==0),] %>%
+new_df <- df[-which(df$zeta==0&df$gamma==0),] 
+
+new_df <- new_df %>%
   mutate(basic = rep(basic$incidence,45),
          model = factor(ifelse(zeta == 0, "factcheck",
                                ifelse(gamma == 0, "deletion",
