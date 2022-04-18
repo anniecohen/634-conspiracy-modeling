@@ -84,7 +84,7 @@ param = c(beta, delta, alpha, N, gamma, zeta)
 
 x0 <- rep(0,4)
 x0[1] = 7060.94
-x0[2] = 131
+x0[2] = 0
 x0[3] = 1.1
 x0[4] = 2936.53
 
@@ -92,6 +92,26 @@ out = ode(y=x0,times=timerange, func=SIR_basic, parms = param, method = 'ode45')
 
 out_df <- data.frame(out) %>%
   mutate(diff = c(0,-1*diff(out[,2])))
+
+out_df = as.data.frame()
+names(out_df) = c('Time', 'S', 'inc', 'I', 'R')
+out_df$date = obsdata$date
+order = c('S', 'I', 'R')
+
+ggplot(data = out_df, aes(x = date)) +
+  theme_classic() +
+  geom_line(aes(y = S, col = 'S')) +
+  geom_line(aes(y = I, col = 'I')) +
+  geom_line(aes(y = R, col = 'R')) +
+  scale_color_manual(breaks = order, values = c("purple","orange","cornflowerblue")) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  scale_y_continuous(limits = c(0, 10000), breaks = c(2500, 5000, 7500)) +
+  labs(x = 'Date', y = 'Size', col = "") +
+  theme(text = element_text(size = 16))
+  
+
+ggsave("fig7.png", width = 7, height = 7)
+  
 
 out_df %>%
   ggplot(aes(x = obsdata$date, y = diff)) +
@@ -609,7 +629,7 @@ data.frame(out) %>%
   theme_classic() +
   theme(text = element_text(size = 16))
 
-ggsave("fig5.png", width = 5, height = 7)
+ggsave("fig5.png", width = 7, height = 7)
 
 data.frame(out) %>%
   mutate(date = obsdata$date) %>%
